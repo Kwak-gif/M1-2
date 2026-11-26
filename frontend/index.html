@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StockPulse AI — 나만의 주식 분석 AI 비서</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-badge">AI</span>
+      <div>
+        <h1>StockPulse AI</h1>
+        <p class="subtitle">종목별 1년 실제 종가 · 변곡점 이슈 · 가격 위치 리스크 · 장 마감 브리핑</p>
+      </div>
+    </div>
+
+    <div class="topbar-controls">
+      <label class="stock-picker" for="stockSelect">
+        <span>종목 선택</span>
+        <select id="stockSelect" aria-label="주식 종목 선택">
+          <option value="005930">삼성전자 (005930)</option>
+          <option value="000150">두산 (000150)</option>
+        </select>
+      </label>
+
+      <div class="export-group">
+        <button id="exportCsvBtn" class="btn btn-outline" type="button" title="선택 종목 CSV 다운로드">CSV 내보내기</button>
+        <button id="exportJsonBtn" class="btn btn-outline" type="button" title="선택 종목 JSON 다운로드">JSON 내보내기</button>
+      </div>
+
+      <button id="themeToggleBtn" class="btn btn-outline" type="button" aria-label="다크 모드 전환">🌙 다크 모드</button>
+      <span id="serverStatusBadge" class="status-badge status-loading">서버 연결 확인 중...</span>
+    </div>
+  </header>
+
+  <div id="coldStartBanner" class="banner banner-info hidden">
+    <span>⏳ 무료 백엔드 서버(Render)가 절전 상태에서 깨어나는 중입니다. 최초 요청 시 30~50초가 소요될 수 있습니다.</span>
+  </div>
+
+  <div id="errorBanner" class="banner banner-error hidden">
+    <span id="errorBannerText"></span>
+    <button id="closeErrorBtn" type="button" class="banner-close">✕</button>
+  </div>
+
+  <main class="container">
+    <!-- 상단 요약 KPI 카드 -->
+    <section class="summary-section" aria-label="종목 데이터 요약">
+      <div class="summary-grid">
+        <article class="kpi-card">
+          <div class="kpi-label">선택 종목 / 분석 기간</div>
+          <div id="kpiStockTitle" class="kpi-value">삼성전자 (005930)</div>
+          <div id="kpiPeriod" class="kpi-sub">데이터 로딩 중...</div>
+        </article>
+        <article class="kpi-card">
+          <div class="kpi-label">최근 종가 (전일 대비)</div>
+          <div id="kpiLatestClose" class="kpi-value">-</div>
+          <div id="kpiLatestChange" class="kpi-sub">-</div>
+        </article>
+        <article class="kpi-card">
+          <div class="kpi-label">1년 평균가 (평균 대비 위치)</div>
+          <div id="kpiAverage" class="kpi-value">-</div>
+          <div id="kpiVsAverage" class="kpi-sub">-</div>
+        </article>
+        <article class="kpi-card">
+          <div class="kpi-label">1년 최고 / 최저 (구간 위치)</div>
+          <div id="kpiHighLow" class="kpi-value">-</div>
+          <div id="kpiRangePosition" class="kpi-sub">-</div>
+        </article>
+        <article class="kpi-card">
+          <div class="kpi-label">최근 20거래일 추세</div>
+          <div id="kpiTrend" class="kpi-value kpi-trend">-</div>
+          <div id="kpiCount" class="kpi-sub">총 0거래일</div>
+        </article>
+      </div>
+
+      <!-- 보너스: 심화 통계 요약 바 -->
+      <div class="bonus-stats-bar">
+        <span><strong>20일선(MA20):</strong> <em id="statMa20">-</em></span>
+        <span><strong>60일선(MA60):</strong> <em id="statMa60">-</em></span>
+        <span><strong>120일선(MA120):</strong> <em id="statMa120">-</em></span>
+        <span><strong>1년 수익률:</strong> <em id="statRet1y">-</em></span>
+        <span><strong>일일 변동성:</strong> <em id="statVol">-</em></span>
+        <span><strong>최대낙폭(MDD):</strong> <em id="statMdd">-</em></span>
+      </div>
+    </section>
+
+    <!-- 보너스: 순수 HTML5 Canvas 주가 추세 시각화 -->
+    <section class="chart-card" aria-label="1년 주가 추세 그래프">
+      <div class="chart-header">
+        <div>
+          <h2 id="chartTitle">1년 종가 추세 &amp; 평균가 기준선</h2>
+          <p class="chart-subtitle">마우스를 올리면 해당 거래일의 실제 종가, 20일 이동평균, 등락률과 메모를 확인할 수 있습니다.</p>
+        </div>
+        <div class="chart-legend">
+          <span class="legend-item"><i class="dot dot-close"></i>일별 종가</span>
+          <span class="legend-item"><i class="dot dot-ma20"></i>20일 이동평균</span>
+          <span class="legend-item"><i class="dot dot-avg"></i>1년 평균가 기준선</span>
+        </div>
+      </div>
+      <div class="chart-canvas-wrap">
+        <canvas id="stockChart" height="220"></canvas>
+        <div id="chartTooltip" class="chart-tooltip hidden"></div>
+      </div>
+    </section>
+
+    <!-- 하단 메인 워크스페이스: 좌측 대화 기록 + 우측 탭(AI 채팅 / 데이터 관리) -->
+    <section class="workspace">
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <h2>대화 기록</h2>
+          <button id="newChatBtn" class="btn btn-primary btn-sm" type="button">+ 새 대화</button>
+        </div>
+        <ul id="conversationList" class="conversation-list">
+          <li class="empty-hint">저장된 대화가 없습니다.</li>
+        </ul>
+      </aside>
+
+      <div class="main-panel">
+        <div class="tabs">
+          <button id="tabChatBtn" class="tab-btn active" type="button">💬 AI 비서 채팅</button>
+          <button id="tabDataBtn" class="tab-btn" type="button">📊 장 마감 데이터 관리 (CRUD)</button>
+        </div>
+
+        <!-- 탭 1: AI 채팅 -->
+        <div id="chatPanel" class="panel-content">
+          <div class="quick-prompts">
+            <span class="quick-label">3대 역할 빠른 질문:</span>
+            <button class="chip-btn" type="button" data-prompt="최근 1년간 가장 크게 급등하거나 급락한 변곡점 날짜들과 [이슈] 메모를 바탕으로 원인 리포트를 정리해줘.">📈 변곡점 &amp; 이슈 분석</button>
+            <button class="chip-btn" type="button" data-prompt="현재 종가가 1년 평균가 및 최고·최저가 대비 어느 위치에 있는지, 이동평균선과 변동성·MDD 관점에서 분할 매수 및 리스크 체크 포인트를 정리해줘.">🛡️ 가격 위치 &amp; 리스크 진단</button>
+            <button class="chip-btn" type="button" data-prompt="최근 5거래일 종가 흐름, 추세, [시황] 메모를 종합해서 오늘 장 마감 데일리 시황 브리핑을 작성해줘.">📰 오늘 장 마감 브리핑</button>
+          </div>
+
+          <div id="chatMessages" class="chat-messages">
+            <div class="chat-welcome">
+              상단에서 <strong>삼성전자</strong> 또는 <strong>두산</strong>을 선택한 뒤, 위의 3대 역할 버튼을 누르거나 자유롭게 질문해 보세요.
+            </div>
+          </div>
+
+          <div id="chatLoading" class="chat-loading hidden">
+            <span class="spinner"></span>
+            <span>선택 종목의 1년 요약 데이터와 도구를 분석해 AI 비서가 답변을 작성 중입니다...</span>
+          </div>
+
+          <form id="chatForm" class="chat-form">
+            <label class="tool-toggle" title="OpenAI Function Calling으로 심화 통계·변곡점 도구를 자동 호출합니다">
+              <input id="useToolsCheckbox" type="checkbox" checked />
+              <span>도구 호출(Function Calling)</span>
+            </label>
+            <div class="chat-input-row">
+              <input
+                id="chatInput"
+                type="text"
+                placeholder="예: 현재 종가가 1년 평균가 대비 어느 위치이고 최근 추세는 어때?"
+                autocomplete="off"
+                required
+              />
+              <button id="sendChatBtn" class="btn btn-primary" type="submit">전송</button>
+            </div>
+          </form>
+
+          <p class="disclaimer">
+            ※ 본 AI 비서의 답변은 Firestore에 저장된 1년 시계열 종가 데이터와 사용자 메모를 기반으로 생성된 참고 정보이며, 특정 종목에 대한 투자 권유가 아닙니다.
+          </p>
+        </div>
+
+        <!-- 탭 2: 데이터 관리 (CRUD) -->
+        <div id="dataPanel" class="panel-content hidden">
+          <form id="dataForm" class="data-form">
+            <h3 id="dataFormTitle">장 마감 데이터 추가 (선택 종목)</h3>
+            <input type="hidden" id="editItemId" value="" />
+
+            <div class="form-grid">
+              <label>
+                <span>거래일자 (YYYY-MM-DD)</span>
+                <input id="inputDate" type="date" required />
+              </label>
+              <label>
+                <span>종가 (원)</span>
+                <input id="inputValue" type="number" min="1" step="1" placeholder="예: 175000" required />
+              </label>
+              <label class="memo-field">
+                <span>이슈 / 리스크 / 시황 메모</span>
+                <div class="memo-tag-row">
+                  <button type="button" class="tag-chip" data-tag="[이슈] ">+ [이슈]</button>
+                  <button type="button" class="tag-chip" data-tag="[리스크] ">+ [리스크]</button>
+                  <button type="button" class="tag-chip" data-tag="[시황] ">+ [시황]</button>
+                </div>
+                <input id="inputMemo" type="text" maxlength="300" placeholder="예: [시황] 외인 순매수 전환, 반도체 동반 강세" />
+              </label>
+            </div>
+
+            <div class="form-actions">
+              <button id="saveDataBtn" class="btn btn-primary" type="submit">데이터 저장</button>
+              <button id="cancelEditBtn" class="btn btn-outline hidden" type="button">수정 취소</button>
+              <span id="dataFormFeedback" class="feedback-text"></span>
+            </div>
+          </form>
+
+          <div class="table-toolbar">
+            <input id="tableSearchInput" type="search" placeholder="날짜 또는 메모 검색 (예: [이슈], [리스크], 2026-11)" />
+            <span id="tableCountBadge" class="muted">0건 표시</span>
+          </div>
+
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>날짜</th>
+                  <th>종목</th>
+                  <th class="num">종가 (원)</th>
+                  <th>메모</th>
+                  <th>관리</th>
+                </tr>
+              </thead>
+              <tbody id="dataTableBody">
+                <tr><td colspan="5" class="empty-hint">데이터를 불러오는 중...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="./config.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>
