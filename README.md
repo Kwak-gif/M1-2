@@ -22,10 +22,9 @@
 ---
 
 ## 3. 배포 URL
-*(Render와 Vercel 배포 완료 후 실제 발급된 URL로 교체하세요.)*
-* **프론트엔드 (Vercel)**: `https://<your-vercel-project>.vercel.app`
-* **백엔드 API (Render)**: `https://<your-render-service>.onrender.com`
-* **Swagger UI (API 문서)**: `https://<your-render-service>.onrender.com/docs`
+* **프론트엔드 (Vercel)**: https://m1-2-frontend-kwak16.vercel.app
+* **백엔드 API (Render)**: https://m1-2-jcak.onrender.com
+* **Swagger UI (API 문서)**: https://m1-2-jcak.onrender.com/docs
 
 > **Render 무료 티어 콜드스타트 안내**: 무료 티어는 일정 시간 요청이 없으면 서버가 절전(Sleep) 상태가 되어 최초 요청 시 30~50초가 소요될 수 있습니다. 프론트엔드 상단 안내 배너와 65초 타임아웃으로 대응하고 있습니다.
 
@@ -115,9 +114,9 @@ sequenceDiagram
 ### 6-3. 멀티채널 연동 검증 (MCP Server & GPT Actions)
 1. **MCP Server (`backend/mcp_server.py`)**:
    * 표준 MCP JSON-RPC 2.0(stdio) 서버로 `get_stock_summary`, `get_stock_statistics`, `get_inflection_points`, `list_recent_conversations` 도구를 외부 클라이언트(Antigravity / Claude Desktop 등)에 노출합니다.
-   * 실행: `set API_BASE_URL=https://<your-render-service>.onrender.com && python backend/mcp_server.py`
+   * 실행: `set API_BASE_URL=https://m1-2-jcak.onrender.com && python backend/mcp_server.py`
 2. **GPT Actions**:
-   * FastAPI가 자동 생성하는 `https://<your-render-service>.onrender.com/openapi.json`을 ChatGPT Custom GPT Actions 스키마에 그대로 등록해 동일 API를 외부 채널에서 호출할 수 있습니다.
+   * FastAPI가 자동 생성하는 `https://m1-2-jcak.onrender.com/openapi.json`을 ChatGPT Custom GPT Actions 스키마에 그대로 등록해 동일 API를 외부 채널에서 호출할 수 있습니다.
 
 ---
 
