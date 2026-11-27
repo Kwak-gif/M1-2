@@ -121,11 +121,12 @@ sequenceDiagram
 ---
 
 ## 7. 제출 스크린샷
-*(배포 완료 후 아래 3장의 스크린샷을 `docs/images/` 폴더에 저장해 첨부하세요.)*
 
-1. **데이터 요약 + 주가 차트가 보이는 AI 채팅 화면 (질문 + 답변 + 도구 호출 배지 포함)**  
-   `![AI 채팅 및 데이터 요약](./docs/images/01_chat_and_summary.png)`
-2. **장 마감 데이터 관리 화면 (CRUD 추가/수정/삭제 동작 확인)**  
-   `![데이터 관리 CRUD](./docs/images/02_data_crud.png)`
-3. **대화 기록 화면 (이전 대화 목록 및 특정 대화 불러오기 동작)**  
-   `![대화 기록 불러오기](./docs/images/03_conversation_history.png)`
+### 1. 데이터 요약 + 주가 차트가 보이는 AI 채팅 화면 (질문 + 답변 + 도구 호출 배지 포함)
+![AI 채팅 및 데이터 요약](https://raw.githubusercontent.com/Kwak-gif/M1-2/main/docs/images/01_chat_and_summary.png)
+
+### 2. 장 마감 데이터 관리 화면 (CRUD 추가/수정/삭제 동작 확인)
+![데이터 관리 CRUD](https://raw.githubusercontent.com/Kwak-gif/M1-2/main/docs/images/02_data_crud.png)
+
+### 3. 대화 기록 화면 (이전 대화 목록 및 특정 대화 불러오기 동작)
+![대화 기록 불러오기](https://raw.githubusercontent.com/Kwak-gif/M1-2/main/docs/images/03_conversation_history.png)

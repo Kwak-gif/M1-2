@@ -120,7 +120,10 @@ def client():
 
     set_firestore_client(fake_db)
     set_openai_client(_FakeOpenAIClient())
+    from services import data_service as _ds
+    _ds.clear_cache()
     yield TestClient(app)
+    _ds.clear_cache()
     set_firestore_client(None)
     set_openai_client(None)
 

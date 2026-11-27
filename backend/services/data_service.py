@@ -1,6 +1,7 @@
 from collections import defaultdict
 from datetime import datetime, timezone
 import math
+import time
 from typing import Any, Optional
 
 from fastapi import HTTPException
@@ -10,6 +11,16 @@ from core.firebase import get_firestore_client
 from schemas.data_schema import DataCreate, DataUpdate
 
 DATA_COLLECTION = "data"
+_CACHE_TTL_SECONDS = 60.0
+_cached_records: Optional[list[dict[str, Any]]] = None
+_cache_expires_at: float = 0.0
+
+
+def clear_cache() -> None:
+    """CRUD 변경 또는 테스트 시 인메모리 캐시를 즉시 무효화합니다."""
+    global _cached_records, _cache_expires_at
+    _cached_records = None
+    _cache_expires_at = 0.0
 
 
 def _utc_now_iso() -> str:
@@ -32,11 +43,27 @@ def _normalize_doc(doc_id: str, raw: dict[str, Any]) -> dict[str, Any]:
 
 
 def _fetch_all_records() -> list[dict[str, Any]]:
+    global _cached_records, _cache_expires_at
+    now = time.monotonic()
+    if _cached_records is not None and now < _cache_expires_at:
+        return list(_cached_records)
+
     db = get_firestore_client()
-    docs = db.collection(DATA_COLLECTION).stream()
-    items = [_normalize_doc(doc.id, doc.to_dict() or {}) for doc in docs]
+    try:
+        docs = db.collection(DATA_COLLECTION).stream()
+        items = [_normalize_doc(doc.id, doc.to_dict() or {}) for doc in docs]
+    except Exception as exc:
+        if "ResourceExhausted" in type(exc).__name__ or "Quota exceeded" in str(exc):
+            raise HTTPException(
+                status_code=503,
+                detail="Firebase Firestore 일일 무료 읽기 한도가 초과되었습니다. (태평양 자정 / 한국시간 오후 5시 초기화)",
+            ) from exc
+        raise
+
     items.sort(key=lambda x: (x["date"], x["created_at"]))
-    return items
+    _cached_records = items
+    _cache_expires_at = now + _CACHE_TTL_SECONDS
+    return list(items)
 
 
 def list_stocks() -> list[dict[str, Any]]:
@@ -80,6 +107,7 @@ def create_data(payload: DataCreate) -> dict[str, Any]:
         "updated_at": now,
     }
     _, doc_ref = db.collection(DATA_COLLECTION).add(record)
+    clear_cache()
     return {"id": doc_ref.id, **record}
 
 
@@ -123,6 +151,7 @@ def update_data(item_id: str, payload: DataUpdate) -> dict[str, Any]:
 
     updates["updated_at"] = _utc_now_iso()
     doc_ref.update(updates)
+    clear_cache()
     current.update(updates)
     return current
 
@@ -134,6 +163,7 @@ def delete_data(item_id: str) -> dict[str, Any]:
     if not doc.exists:
         raise HTTPException(status_code=404, detail=f"삭제할 데이터를 찾을 수 없습니다: {item_id}")
     doc_ref.delete()
+    clear_cache()
     return {"deleted": True, "id": item_id}
 
 
